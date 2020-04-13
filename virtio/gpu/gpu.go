@@ -254,51 +254,29 @@ type capsV1 struct {
 }
 
 type capsV2 struct {
-	v1                                  capsV1
-	min_aliased_point_size              float32
-	max_aliased_point_size              float32
-	min_smooth_point_size               float32
-	max_smooth_point_size               float32
-	min_aliased_line_width              float32
-	max_aliased_line_width              float32
-	min_smooth_line_width               float32
-	max_smooth_line_width               float32
-	max_texture_lod_bias                float32
-	max_geom_output_vertices            uint32
-	max_geom_total_output_components    uint32
-	max_vertex_outputs                  uint32
-	max_vertex_attribs                  uint32
-	max_shader_patch_varyings           uint32
-	min_texel_offset                    int32
-	max_texel_offset                    int32
-	min_texture_gather_offset           int32
-	max_texture_gather_offset           int32
-	texture_buffer_offset_alignment     uint32
-	uniform_buffer_offset_alignment     uint32
-	shader_buffer_offset_alignment      uint32
-	capability_bits                     uint32
-	sample_locations                    [8]uint32
-	max_vertex_attrib_stride            uint32
-	max_shader_buffer_frag_compute      uint32
-	max_shader_buffer_other_stages      uint32
-	max_shader_image_frag_compute       uint32
-	max_shader_image_other_stages       uint32
-	max_image_samples                   uint32
-	max_compute_work_group_invocations  uint32
-	max_compute_shared_memory_size      uint32
-	max_compute_grid_size               [3]uint32
-	max_compute_block_size              [3]uint32
-	max_texture_2d_size                 uint32
-	max_texture_3d_size                 uint32
-	max_texture_cube_size               uint32
-	max_combined_shader_buffers         uint32
-	max_atomic_counters                 [6]uint32
-	max_atomic_counter_buffers          [6]uint32
-	max_combined_atomic_counters        uint32
-	max_combined_atomic_counter_buffers uint32
-	host_feature_check_version          uint32
-	supported_readback_formats          supportedFormatMask
-	scanout                             supportedFormatMask
+	v1                               capsV1
+	min_aliased_point_size           float32
+	max_aliased_point_size           float32
+	min_smooth_point_size            float32
+	max_smooth_point_size            float32
+	min_aliased_line_width           float32
+	max_aliased_line_width           float32
+	min_smooth_line_width            float32
+	max_smooth_line_width            float32
+	max_texture_lod_bias             float32
+	max_geom_output_vertices         uint32
+	max_geom_total_output_components uint32
+	max_vertex_outputs               uint32
+	max_vertex_attribs               uint32
+	max_shader_patch_varyings        uint32
+	min_texel_offset                 int32
+	max_texel_offset                 int32
+	min_texture_gather_offset        int32
+	max_texture_gather_offset        int32
+	texture_buffer_offset_alignment  uint32
+	uniform_buffer_offset_alignment  uint32
+	shader_buffer_offset_alignment   uint32
+	capability_bits                  uint32
 }
 
 const (
@@ -545,7 +523,7 @@ func New() (*Device, error) {
 		return nil, err
 	}
 	if caps.capability_bits&_VIRGL_CAP_COPY_TRANSFER == 0 {
-		return nil, errors.New("virtgpu: VIRGL_CAP_COPY_TRANSFER not supported")
+		return nil, errors.New("virtgpu: VIRGL_CAP_COPY_TRANSFER not supported (qemu version < 4.2.0?)")
 	}
 	ctxID := d.cmdCtxCreate()
 	if err := d.Flush3D(); err != nil {
@@ -560,8 +538,8 @@ func newDevice(dev *virtio.Device) (*Device, error) {
 	if err != nil {
 		return nil, err
 	}
-	if unsafe.Sizeof(config{}) > uintptr(len(devCfgMap)) {
-		return nil, errors.New("gpu: device configuration area too small")
+	if cfgSize := uintptr(len(devCfgMap)); unsafe.Sizeof(config{}) > cfgSize {
+		return nil, fmt.Errorf("gpu: device configuration area too small (%d bytes)", cfgSize)
 	}
 	cfg := (*config)(unsafe.Pointer(&devCfgMap[0]))
 	var controlq *virtio.Queue
@@ -1428,8 +1406,8 @@ func (d *Device) queryCaps() (capsV2, error) {
 	req := (*getCapsetReq)(ptrs[0])
 	resp := (*ctrlHdr)(ptrs[1])
 	capsBuf := bufs[1].Mem[unsafe.Sizeof(ctrlHdr{}):]
-	if uintptr(len(capsBuf)) < unsafe.Sizeof(capsV2{}) {
-		return capsV2{}, fmt.Errorf("virtgpu: the VIRTIO_GPU_CAPSET_VIRGL2 capability structure is too small")
+	if capsSize := uintptr(len(capsBuf)); capsSize < unsafe.Sizeof(capsV2{}) {
+		return capsV2{}, fmt.Errorf("virtgpu: the VIRTIO_GPU_CAPSET_VIRGL2 capability structure is too small (%d bytes)", capsSize)
 	}
 	cap := (*capsV2)(unsafe.Pointer(&capsBuf[0]))
 	*req = getCapsetReq{
